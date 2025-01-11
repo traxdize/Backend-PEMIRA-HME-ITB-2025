@@ -4,7 +4,7 @@ const express = require('express');
 const app = express();
 const mongoose = require('mongoose');
 const cors = require('cors');
-const CookiePraser = require('cookie-parser')
+const CookieParser = require('cookie-parser')
 const jwt = require('jsonwebtoken');
 
 
@@ -28,7 +28,7 @@ app.use(cors({
 }));
 
 // COOKIES MIDDLEWARE
-app.use(CookiePraser());
+app.use(CookieParser());
 
 // VAR INIT
 const PORT = process.env.PORT;
@@ -38,7 +38,7 @@ const TOKEN = process.env.TOKEN
 
 // MAIN ROUTE
 app.get('/', (req, res) => {
-    res.send('Pemilihan Umum Raya HME ITB 2023 API')
+    res.send('Pemilihan Umum Raya HME ITB 2025 API')
 })
 
 // NODEMAILER
@@ -124,7 +124,7 @@ async function sendEmail (username, pass, email){
     });
     try {
         const info = await transporter.sendMail({
-            from: "Pemira HME ITB 2023 <pemirahmeitb2023@gmail.com>",
+            from: "Pemira HME ITB 2023 <pemirahme@gmail.com>",
             to: email,
             subject: 'Credential Information',
             html: html(username, pass),
@@ -154,7 +154,7 @@ app.post('/api/send_credential', async (req, res) => {
         if (token == TOKEN) {
             // Mengirimkan response
             
-            const email = username+"@mahasiswa.itb.ac.id"
+            const email = username+"@std.stei.itb.ac.id"
             let MailCredentialStatus = await sendEmail(username, pass, email)
             res.status(200).json({ 
                 action: "success",
@@ -363,10 +363,10 @@ app.post('/api/is_vote', async (req, res) => {
 
 app.get('/api/live_count', async (req, res) => {
     try {
-        const Bright = await Ballot.countDocuments({ pilihan: '1' })
+        const Poggy = await Ballot.countDocuments({ pilihan: '1' })
         const Kotak = await Ballot.countDocuments({ pilihan: '2' })
 
-        res.status(200).json({ bright: Bright, kotak: Kotak });
+        res.status(200).json({ Poggy: Poggy, kotak: Kotak });
     } catch (err) {
         res.status(500).json({ message: 'Terjadi kesalahan saat menghitung suara.', error: err.message });
     }
@@ -374,10 +374,10 @@ app.get('/api/live_count', async (req, res) => {
 
 app.get('/api/live_count_total', async (req, res) => {
     try {
-        const Bright = await Ballot.countDocuments({ pilihan: '1' })
+        const Poggy = await Ballot.countDocuments({ pilihan: '1' })
         const Kotak = await Ballot.countDocuments({ pilihan: '2' })
 
-        res.status(200).json({ suara: Bright + Kotak });
+        res.status(200).json({ suara: Poggy + Kotak });
     } catch (err) {
         res.status(500).json({ message: 'Terjadi kesalahan saat menghitung suara.', error: err.message });
     }
