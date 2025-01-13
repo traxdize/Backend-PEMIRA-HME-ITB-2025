@@ -87,8 +87,8 @@ const html = (username, pass) => {
             .content {
                 padding: 50px;
                 height: 400px;
-                color: rgb(14, 97, 12);
-                background-image: linear-gradient(#d6d1b0, rgb(152, 182, 98));
+                color: rgb(0, 0, 0);
+                background-image: linear-gradient(#d6d1b0, rgb(224, 182, 110));
             }
             .footer {
                 background-color: #0c0605; 
@@ -110,7 +110,7 @@ const html = (username, pass) => {
                 <b>Divisi Komputer Pemira HME ITB</b>
             </div>       
             <div class="content">
-                <h1>Halo CHAMP!!</h1>
+                <h1 style="text-align: center;">SALAM DEMOKRASI CHAMP!!</h1>
                 <p>Berikut informasi kredensial akun pemira kamu.</p>
                 <h4>Username : ${username}</h4>
                 <h4>Password : ${pass}</h4>            
@@ -148,7 +148,7 @@ async function sendEmail(username, pass, email) {
 
         const info = await transporter.sendMail({
             from: {
-                name: 'Pemira HME ITB 2023',
+                name: 'Pemira HME ITB 2024',
                 address: process.env.USERNAME_MAIL
             },
             to: email,
