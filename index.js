@@ -116,7 +116,7 @@ const html = (username, pass) => {
                 <h4>Password : ${pass}</h4>            
             </div>
             <div class="footer">
-                <b>© PEMIRA HME ITB 2023</b>
+                <b>© PEMIRA HME ITB 2024</b>
             </div>
         </div>
     </body>
@@ -125,37 +125,43 @@ const html = (username, pass) => {
     `);
 };
 
-async function sendEmail (username, pass, email){
-    console.log("pengiriman dimulai", Date())
+async function sendEmail(username, pass, email) {
+    console.log(`Starting email dispatch to ${username} at ${new Date().toISOString()}`);
+    
     const transporter = nodeMailer.createTransport({
         service: 'gmail',
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
         auth: {
-            user : process.env.USERNAME_MAIL,
+            user: process.env.USERNAME_MAIL,
             pass: process.env.PASS_MAIL
         },
         tls: {
-            // do not fail on invalid certs
-            rejectUnauthorized: false,
-        },
+            rejectUnauthorized: true // Enable for production
+        }
     });
+
     try {
+        // Verify SMTP connection configuration
+        await transporter.verify();
+
         const info = await transporter.sendMail({
-            from: "Pemira HME ITB 2023 <pemirahme@gmail.com>",
+            from: {
+                name: 'Pemira HME ITB 2023',
+                address: process.env.USERNAME_MAIL
+            },
             to: email,
             subject: 'Credential Information',
             html: html(username, pass),
-        })
-        if (info){
-            console.log("pengiriman email berhasil dijalankan pada", Date(), info);
-        }
-        return info
+        });
+
+        console.log(`Email sent successfully to ${username} at ${new Date().toISOString()}`);
+        return info;
     } catch (error) {
-        console.error("Terjadi kesalahan saat mengirim email:", error);
-        return error
-    } 
+        console.error(`Email sending failed for ${username}:`, error.message);
+        return error;
+    }
 }
 
 // Kirim E-Mail
@@ -473,53 +479,67 @@ app.delete('/admin/api/deleteVote', async (req, res) => {
 // BULK REGISTRATION OF VOTERS
 app.post('/api/bulk_register', limiter, async (req, res) => {
     try {
-        const {voters, token} = req.body;
+        const { voters, token } = req.body;
 
         if (!Array.isArray(voters) || !token) {
             return res.status(400).json({
                 error: 'Bad Request',
-                message: 'Format invalid'
+                message: 'Invalid request format'
             });
         }
 
         if (token !== TOKEN) {
             return res.status(401).json({
-                error: 'Unauthorized token',
-                message: 'API Token tidak sama, request terminated'
+                error: 'Unauthorized',
+                message: 'API Token not match, API Request Terminated'
             });
         }
 
         const results = [];
         const batchSize = 50;
+        const successfulVoters = [];
 
         for (let i = 0; i < voters.length; i += batchSize) {
             const batch = voters.slice(i, i + batchSize);
-
-            const batchResults = await Promise.allSettled(
-                batch.map(async (voter) => {
+            
+            for (const voter of batch) {
+                try {
                     const password = generateSecurePassword();
                     const email = `${voter.username}@std.stei.itb.ac.id`;
 
-                    // Check availability
-                    const existingUser = await VotersProfile.findOne({username: voter.username});
+                    // Check if user exists
+                    const existingUser = await VotersProfile.findOne({ username: voter.username });
                     if (existingUser) {
-                        throw new Error(`User ${voter.username} sudah ada`);
+                        console.log(`User ${voter.username} already exists, skipping`);
+                        continue;
                     }
 
-                    // Create voter profile
+                    // Try to send email first
+                    const mailStatus = await sendEmail(voter.username, password, email);
+                    
+                    if (!mailStatus || mailStatus instanceof Error) {
+                        console.error(`Failed to send email to ${voter.username}`);
+                        continue;
+                    }
+
+                    // Only save to database if email was sent successfully
                     await VotersProfile.create({
                         username: voter.username,
                         pass: password,
                         email: email
                     });
 
-                    // Send email
-                    return sendEmail(voter.username, password, email);
-                })
-            );
-            results.push(...batchResults);
+                    successfulVoters.push({
+                        username: voter.username,
+                        messageId: mailStatus.messageId
+                    });
 
-            // Delay
+                } catch (error) {
+                    console.error(`Failed to process voter ${voter.username}:`, error);
+                }
+            }
+            
+            // Add delay between batches
             if (i + batchSize < voters.length) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
@@ -527,15 +547,41 @@ app.post('/api/bulk_register', limiter, async (req, res) => {
 
         res.status(200).json({
             status: 'success',
-            processed: results.length,
-            successful: results.filter(r => r.status === 'fulfilled').length,
-            failed: results.filter(r => r.status === 'rejected').length
+            processed: voters.length,
+            successful: successfulVoters.length,
+            failed: voters.length - successfulVoters.length,
+            successfulVoters: successfulVoters
         });
+
     } catch (error) {
-        console.error('Bulk registration gagal:', error);
+        console.error('Bulk registration failed:', error);
         res.status(500).json({
             error: 'Internal Server Error',
-            message: 'Failed to process.'
+            message: 'Failed to process bulk registration'
+        });
+    }
+});
+
+app.delete('/admin/api/clearBallots', async (req, res) => {
+    const { token } = req.body;
+
+    if (!token || token !== TOKEN) {
+        return res.status(401).json({
+            error: 'Unauthorized',
+            message: 'Invalid token'
+        });
+    }
+
+    try {
+        await VotersProfile.deleteMany({});
+        res.status(200).json({ 
+            message: 'All ballot data has been cleared successfully' 
+        });
+    } catch (err) {
+        res.status(500).json({ 
+            error: 'Internal Server Error',
+            message: 'Failed to clear ballot data',
+            details: err.message 
         });
     }
 });
