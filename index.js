@@ -6,6 +6,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const CookieParser = require('cookie-parser')
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 
 
 //ASSIGN DATA MODEL
@@ -21,6 +23,12 @@ app.use(express.json())
 app.use(express.urlencoded({extended: false}))
 
 
+// Rate limiter
+const limiter = rateLimit ({
+    windowMs: 15 * 60 * 1000,
+    max: 100
+});
+
 // OAUTH API CORS
 
 app.use(cors({
@@ -35,6 +43,17 @@ const PORT = process.env.PORT;
 const mongodbAPI = process.env.MONGODB_API;
 const TOKEN = process.env.TOKEN
 
+// GENERATE SECURE PASSWORD
+function generateSecurePassword(){
+    const length = 12;
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < length; i++){
+        const randomIndex = crypto.randomInt(charset.length);
+        password += charset[randomIndex];
+    }
+    return password; 
+}
 
 // MAIN ROUTE
 app.get('/', (req, res) => {
@@ -449,6 +468,76 @@ app.delete('/admin/api/deleteVote', async (req, res) => {
         }
     }
 
+});
+
+// BULK REGISTRATION OF VOTERS
+app.post('/api/bulk_register', limiter, async (req, res) => {
+    try {
+        const {voters, token} = req.body;
+
+        if (!Array.isArray(voters) || !token) {
+            return res.status(400).json({
+                error: 'Bad Request',
+                message: 'Format invalid'
+            });
+        }
+
+        if (token !== TOKEN) {
+            return res.status(401).json({
+                error: 'Unauthorized token',
+                message: 'API Token tidak sama, request terminated'
+            });
+        }
+
+        const results = [];
+        const batchSize = 50;
+
+        for (let i = 0; i < voters.length; i += batchSize) {
+            const batch = voters.slice(i, i + batchSize);
+
+            const batchResults = await Promise.allSettled(
+                batch.map(async (voter) => {
+                    const password = generateSecurePassword();
+                    const email = `${voter.username}@std.stei.itb.ac.id`;
+
+                    // Check availability
+                    const existingUser = await VotersProfile.findOne({username: voter.username});
+                    if (existingUser) {
+                        throw new Error(`User ${voter.username} sudah ada`);
+                    }
+
+                    // Create voter profile
+                    await VotersProfile.create({
+                        username: voter.username,
+                        pass: password,
+                        email: email
+                    });
+
+                    // Send email
+                    return sendEmail(voter.username, password, email);
+                })
+            );
+            results.push(...batchResults);
+
+            // Delay
+            if (i + batchSize < voters.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        res.status(200).json({
+            status: 'success',
+            processed: results.length,
+            successful: results.filter(r => r.status === 'fulfilled').length,
+            failed: results.filter(r => r.status === 'rejected').length
+        });
+    } catch (error) {
+        console.error('Bulk registration gagal:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            message: 'Failed to process.'
+        });
+    }
 });
 
 
