@@ -594,3 +594,5 @@ mongoose.connect(mongodbAPI)
 }).catch((error) => {
     console.log(error)
 })
+
+module.exports = app;
