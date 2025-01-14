@@ -604,7 +604,7 @@ app.delete('/admin/api/clearBallots', async (req, res) => {
 
 
 // MONGODB CONNECTION
-mongoose.connect(mongodbAPI)
+connectToDatabase()
 .then(() => {
     console.log('connected to mongodb')
 }).catch((error) => {
