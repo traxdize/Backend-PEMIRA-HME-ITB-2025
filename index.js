@@ -152,7 +152,7 @@ async function sendEmail(username, pass, email) {
                 address: process.env.USERNAME_MAIL
             },
             to: email,
-            subject: 'Credential Information',
+            subject: 'Credential Akun Pemira',
             html: html(username, pass),
         });
 
