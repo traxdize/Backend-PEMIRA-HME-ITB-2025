@@ -29,22 +29,6 @@ const limiter = rateLimit ({
     max: 100
 });
 
-let cachedDb = null;
-
-async function connectToDatabase() {
-    if (cachedDb) {
-        return cachedDb;
-    }
-    
-    const db = await mongoose.connect(process.env.MONGODB_API, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-    });
-    
-    cachedDb = db;
-    return db;
-}
-
 // OAUTH API CORS
 
 app.use(cors({
@@ -604,7 +588,7 @@ app.delete('/admin/api/clearBallots', async (req, res) => {
 
 
 // MONGODB CONNECTION
-connectToDatabase()
+mongoose.connect(mongodbAPI)
 .then(() => {
     console.log('connected to mongodb')
 }).catch((error) => {
