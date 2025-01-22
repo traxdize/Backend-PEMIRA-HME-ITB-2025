@@ -125,6 +125,73 @@ const html = (username, pass) => {
     `);
 };
 
+const pengumuman = () => {
+    
+    return(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+        <style>
+            body {
+                display: flex;
+                height: 100vh;
+                font-family: Arial, sans-serif;
+                margin: 0;
+            }
+            .container {
+                margin: auto;
+                width: 500px;
+            }
+            .content {
+                padding: 50px;
+                height: 550px;
+                color: rgb(0, 0, 0);
+                background-image: linear-gradient(#d6d1b0, rgb(224, 182, 110));
+                text-align: justify;
+            }
+            .footer {
+                background-color: #0c0605; 
+                color: #E6DB9Cff; 
+                text-align: center;
+                padding: 20px;
+            }
+            .header{
+                background-color: rgb(130, 64, 52); 
+                color: #E6DB9Cff; 
+                text-align: center;
+                padding: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container"> 
+            <div class="header">
+                <b>Divisi Komputer Pemira HME ITB</b>
+            </div>       
+            <div class="content">
+                <h1 style="text-align: center;">Selamat pagi Champ!</h1>
+                <p>Panitia PEMIRA HME ITB ingin menginformasikan bahwa dikirimkannya pesan ini kepada Champ didasari oleh kuorum yang tidak terpenuhi pada PEMIRA HME ITB yang dilaksanakan tanggal 15-16 Januari lalu. </p>
+                <h4>Sebagai bentuk respon dari kejadian ini, MPA HME ITB mengambil langkah berupa form analkon (Analisis Kondisi) yang berikan pada pesan ini. Form Analkon dibagikan untuk mengumpulkan aspirasi massa mengenai mekanisme PEMIRA yang sudah dilakukan oleh panitia. respon yang Champ berikan akan sangat berarti bagi MPA untuk mengambil keputusan terkait keberlangsungan PEMIRA. </h4>
+                <h4>Maka dari itu, kami harap Champ dapat meluangkan sedikit waktunya untuk mengisi form di bawah ini.</h4>
+                <h4><a href="https://forms.gle/Peybs1gGn33UswkE7" target="_blank">Klik di sini untuk mengisi form</a></h4>
+                <h4>Untuk perhatiannya, kami ucapkan terimakasih.</h4>
+                <h4 style="text-align: center;">MPA HME ITB</h4>
+
+            </div>
+            <div class="footer">
+                <b>© PEMIRA HME ITB 2024</b>
+            </div>
+        </div>
+    </body>
+    </html>
+        `)
+
+}
+
 async function sendEmail(username, pass, email) {
     console.log(`Starting email dispatch to ${username} at ${new Date().toISOString()}`);
     
@@ -154,6 +221,45 @@ async function sendEmail(username, pass, email) {
             to: email,
             subject: 'Credential Akun Pemira',
             html: html(username, pass),
+        });
+
+        console.log(`Email sent successfully to ${username} at ${new Date().toISOString()}`);
+        return info;
+    } catch (error) {
+        console.error(`Email sending failed for ${username}:`, error.message);
+        return error;
+    }
+}
+
+async function sendBroadcastEmail(username, pass, email, subject, message) {
+    console.log(`Starting email dispatch to ${username} at ${new Date().toISOString()}`);
+    
+    const transporter = nodeMailer.createTransport({
+        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: {
+            user: process.env.USERNAME_MAIL,
+            pass: process.env.PASS_MAIL
+        },
+        tls: {
+            rejectUnauthorized: true // Enable for production
+        }
+    });
+
+    try {
+        // Verify SMTP connection configuration
+        await transporter.verify();
+
+        const info = await transporter.sendMail({
+            from: {
+                name: 'Pemira HME ITB 2024',
+                address: process.env.USERNAME_MAIL
+            },
+            to: email,
+            subject: subject, // Pass the subject dynamically
+            html: pengumuman() // Generate the email content dynamically using `pengumuman`
         });
 
         console.log(`Email sent successfully to ${username} at ${new Date().toISOString()}`);
@@ -561,6 +667,90 @@ app.post('/api/bulk_register', limiter, async (req, res) => {
         });
     }
 });
+
+// BULK EMAIL BLASTING (GENERIC)
+
+app.post('/api/bulk_email_blast', limiter, async (req, res) => {
+    try {
+        const { recipients, token, subject } = req.body;
+
+        // Validate inputs
+        if (!Array.isArray(recipients) || !token || !subject) {
+            return res.status(400).json({
+                error: 'Bad Request',
+                message: 'Invalid request format. Recipients, token, and subject are required.'
+            });
+        }
+
+        if (token !== TOKEN) {
+            return res.status(401).json({
+                error: 'Unauthorized',
+                message: 'API Token does not match, API Request Terminated'
+            });
+        }
+
+        const successfulRecipients = [];
+        const failedRecipients = [];
+
+        const batchSize = 50; // To avoid overloading the email server
+
+        for (let i = 0; i < recipients.length; i += batchSize) {
+            const batch = recipients.slice(i, i + batchSize);
+
+            for (const recipient of batch) {
+                try {
+                    // Validate recipient's format (username or email address)
+                    const email = recipient.includes('@') ? recipient : `${recipient}@std.stei.itb.ac.id`;
+
+                    const mailStatus = await sendBroadcastEmail(
+                        recipient, 
+                        '', // Pass empty if no password is required
+                        email, 
+                        subject,
+                        pengumuman // Generate HTML dynamically
+                    );
+
+                    if (!mailStatus || mailStatus instanceof Error) {
+                        console.error(`Failed to send email to ${recipient}`);
+                        failedRecipients.push(recipient);
+                        continue;
+                    }
+
+                    successfulRecipients.push({
+                        recipient,
+                        messageId: mailStatus.messageId
+                    });
+                } catch (error) {
+                    console.error(`Failed to send email to ${recipient}:`, error.message);
+                    failedRecipients.push(recipient);
+                }
+            }
+
+            // Add delay between batches
+            if (i + batchSize < recipients.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        res.status(200).json({
+            status: 'success',
+            total: recipients.length,
+            successful: successfulRecipients.length,
+            failed: failedRecipients.length,
+            successfulRecipients,
+            failedRecipients
+        });
+
+    } catch (error) {
+        console.error('Bulk email blast failed:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            message: 'Failed to process bulk email blast'
+        });
+    }
+});
+
+
 
 app.delete('/admin/api/clearBallots', async (req, res) => {
     const { token } = req.body;
