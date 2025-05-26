@@ -494,10 +494,10 @@ app.post('/api/is_vote', async (req, res) => {
 
 app.get('/api/live_count', async (req, res) => {
     try {
-        const Poggy = await Ballot.countDocuments({ pilihan: '1' })
+        const Arran = await Ballot.countDocuments({ pilihan: '1' })
         const Kotak = await Ballot.countDocuments({ pilihan: '2' })
 
-        res.status(200).json({ Poggy: Poggy, kotak: Kotak });
+        res.status(200).json({ Arran: Arran, kotak: Kotak });
     } catch (err) {
         res.status(500).json({ message: 'Terjadi kesalahan saat menghitung suara.', error: err.message });
     }
