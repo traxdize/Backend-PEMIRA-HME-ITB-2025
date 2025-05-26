@@ -13,7 +13,8 @@ const BallotSchema = mongoose.Schema(
         }
     },
     {
-        timestamps: true
+        timestamps: true,
+        collection: 'ballotsenator'
     }
 );
 
